@@ -1,12 +1,15 @@
 \import Data.Bool
 \import Data.List (List, length)
 \import Logic
+\import Meta
+\import Paths.Meta
 \import lect06
 \open Nat(+,*)
 
 -- 1. Определите предикат принадлежности элемента списку.
 
-\data In {A : \Type} (a : A) (xs : List A)
+\data In {A : \Type} (a : A) (xs : List A) \elim xs
+  | x List.:: xs => { step (In a xs) | eq (x = a) }
 
 -- Optional:
 -- 2. Докажите эквивалентность четырех различных определений LessOrEq: lessOrEq, lessOrEq', LessOrEq и LessOrEq'.
@@ -15,6 +18,9 @@
 --    То есть ReflTransClosure R -- это минимальное рефлексивное и транзитивное отношение, содержащее R.
 
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
+  | RTC_given (R x y)
+  | RTC_reflc (x = y)
+  | RTC_trans (z : A) (ReflTransClosure R x z) (ReflTransClosure R z y)
 
 -- 4. Докажите, что если R уже рекфлексивно и транзитивно, то ReflTransClosure R эквивалентно R.
 
@@ -22,20 +28,62 @@
 
 \func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type) (refl : \Pi (x : A) -> R x x) (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
   : \Pi (x y : A) -> R x y <-> ReflTransClosure R x y
-  => {?}
+  => \lam _ _ => (RTC_given, helper)
+  \where {
+    \func helper {x y : A} (r : ReflTransClosure R x y) : R x y \elim r
+      | RTC_given r => r
+      | RTC_reflc p => rewrite p (refl y)
+      | RTC_trans z xz zy => trans x z y (helper xz) (helper zy)
+  }
 
 -- 5. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys".
 
+\data Sublist {A : \Type} (xs ys : List A) \elim xs, ys
+  | List.nil, _ => NilSublist
+  | x List.:: xs, y List.:: ys => EqualSublist (x = y) (Sublist xs ys)
+  | xs, y List.:: ys => SkipSublist (Sublist xs ys)
+
 -- 6. Докажите, что Sublist (filter p xs) xs для любых p и xs.
+
+\func filter-sublist {A : \Type} (p : A -> Bool) (as : List A) : Sublist (filter p as) as \elim as
+  | List.nil => NilSublist
+  | a List.:: as =>
+    cases (p a) \with {
+      | true => EqualSublist idp (filter-sublist p as)
+      | false => SkipSublist (filter-sublist p as)
+    }
 
 -- 7. Определите filter через if, а не через \case.
 --     Докажите для этой версии filter лемму filter-lem.
 
-\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A => {?}
+\func filter' {A : \Type} (p : A -> Bool) (xs : List A) : List A \elim xs
+  | List.nil => List.nil
+  | x List.:: xs => if (p x) (x List.:: filter' p xs) (filter' p xs)
 
-\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : LessOrEq (length (filter' p xs)) (length xs) => {?}
+\func filter-lem {A : \Type} (p : A -> Bool) (xs : List A) : LessOrEq (length (filter' p xs)) (length xs) \elim xs
+  | List.nil => zero<=_
+  | x List.:: xs => cases (p x) \with {
+    | false => <=-step-lem (filter-lem p xs)
+    | true => suc<=suc (filter-lem p xs)
+  }
 
 -- 8. Закончите определение функции \func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x из лекции.
+
+\func BoolFuncLem (f : Bool -> Bool) (x : Bool) : f (f (f x)) = f x
+  => \case
+       \elim x, f true \as ft,
+               f false \as ff,
+            idp : f true = ft,
+            idp : f false = ff \with {
+    | false, false, false, ift, iff => rewrite iff (rewrite iff iff)
+    | false, false, true, ift, iff => rewrite iff (rewrite ift iff)
+    | false, true, false, ift, iff => rewrite iff (rewrite iff iff)
+    | false, true, true, ift, iff => rewrite iff (rewrite ift ift)
+    | true, false, false, ift, iff => rewrite ift (rewrite iff iff)
+    | true, false, true, ift, iff => rewrite ift (rewrite iff ift)
+    | true, true, false, ift, iff => rewrite ift (rewrite ift ift)
+    | true, true, true, ift, iff => rewrite ift (rewrite ift ift)
+  }
 
 -- 9. Докажите, что предикат isEven разрешим.
 
