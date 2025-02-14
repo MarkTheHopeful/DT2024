@@ -1,4 +1,8 @@
 \import Data.Bool
+\import Data.List (List, nil, length)
+\import Paths
+\import lect01 (*, +)
+\import lect02 (T, absurd)
 \import lect04
 
 -- 1. Напишите функцию lookup, которая принимает List A и натуральное число и возвращает элемент по заданому индексу.
@@ -11,34 +15,76 @@
   | suc x, 0 => false
   | suc x, suc y => x < y
 
-\func lookup => {?}
+\func lookup {A : \Type} (as : List A) (n : Nat) (bound : T (n < length as)) : A \elim as, n
+  | List.nil, 0 => absurd bound
+  | List.nil, suc n => absurd bound
+  | a List.:: as, 0 => a
+  | a List.:: as, suc n => lookup as n bound
 
 -- 2. Реализуйте аналоги функции replicate для vec и Vec (эта функция создает список заданной длины, состоящий из повторений данного элемента).
 
+\func replicate {A : \Type} (a : A) (n : Nat) : vec A n \elim n
+  | 0 => ()
+  | suc n => (a, replicate a n)
+
+\func replicate' {A : \Type} (a : A) (n : Nat) : Vec A n \elim n
+  | 0 => Vec.nil
+  | suc n => cons a (replicate' a n)
+
 -- 3. Реализуйте аналоги функции map для vec и Vec.
+
+\func map {A B : \Type} {n : Nat} (f : A -> B) (v : vec A n) : vec B n \elim n, v
+  | 0, _ => ()
+  | suc n, (a, v) => (f a, map f v)
+
+\func map' {A B : \Type} {n : Nat} (f : A -> B) (v : Vec A n) : Vec B n \elim n, v
+  | 0, _ => Vec.nil
+  | suc n, Vec.cons a v => cons (f a) (map' f v)
 
 -- 4. Реализуйте аналоги функции zipWith для vec и Vec.
 --    Функция должна принимать вектора одинаковой длины.
 
+\func zipWith {A B : \Type} {n : Nat} (va : vec A n) (vb : vec B n) : vec (\Sigma A B) n \elim n, va, vb
+  | 0, _, _ => ()
+  | suc n, (a, va), (b, vb) => ((a, b), zipWith va vb)
+
+\func zipWith' {A B : \Type} {n : Nat} (va : Vec A n) (vb : Vec B n) : Vec (\Sigma A B) n \elim n, va, vb
+  | 0, _, _ => Vec.nil
+  | suc n, Vec.cons a va, Vec.cons b vb => cons (a, b) (zipWith' va vb)
+
 -- 5. Определите тип CTree A n полных бинарных деревьев высоты ровно n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data CTree (A : \Type) (n : Nat)
+\data CTree (A : \Type) (n : Nat) \elim n
+  | 0 => CLeaf
+  | suc n => CNode A (CTree A n) (CTree A n)
 
 -- 6. Определите тип Tree A n бинарных деревьев высоты не больше n, которые хранят элементы только во внутренних узлах, но не в листьях.
 --    Высота листа равна 0.
 
-\data Tree (A : \Type) (n : Nat)
+\data Tree (A : \Type) (n : Nat) \elim n
+  | 0 => Leaf
+  | suc n => {
+    | Leaf2
+    | Node A (Tree A n) (Tree A n)
+  }
 
 -- определите функцию, возвращающую высоту дерева.
 
-\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) => {?}
+\func height {A : \Type} (n : Nat) (t : Tree A n) : Fin (suc n) \elim n, t
+  | 0, Tree.Leaf => fzero
+  | suc n, Tree.Leaf2 => fzero
+  | suc n, Node a t1 t2 => \let | h1 => height n t1
+                                | h2 => height n t2
+                           \in fsuc (if (toNat h1 < toNat h2) h2 h1)
 
 -- 7. Функции Fin n -> A соответствуют спискам элементов A длины n.
 --     Функция, преобразующая Vec A n в Fin n -> A, была реализована на лекции.
 --     Реализуйте обратную функцию.
 
-\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n => {?}
+\func coin {A : \Type} {n : Nat} (f : Fin n -> A) : Vec A n \elim n
+  | 0 => Vec.nil
+  | suc n => Vec.cons (f fzero) (coin (\lam (x : Fin n) => f (fsuc x)))
 
 -- Optional task
 -- 8. Определите тип матриц и ряд функций над ними.
@@ -64,7 +110,12 @@
 
 -- 9. Определите факториал через Nat-rec.
 
+\func fac (n : Nat) : Nat => Nat-rec Nat 1 (\lam x acc => suc x * acc) n
+
 -- 10. Докажите ассоциативность сложения для натуральных чисел через Nat-elim.
+
+\func add-assoc (x y z : Nat) : (x + y) + z = x + (y + z) =>
+  Nat-elim (\lam z => (x + y) + z = x + (y + z)) idp (\lam _ p => pmap suc p) z
 
 -- 11. Определите рекурсор и элиминатор для D.
 
